@@ -46,11 +46,11 @@ class RunConfig:
                                  help="Semi-colon separated list of the Cassandra servers")
         self.parser.add_argument("-d", "--datacenters", type=str, default="local",
                                  help="Semi-colon separated list of the datacenters")
-        self.parser.add_argument("--local-dc", type=str, default="local",
+        self.parser.add_argument("-l","--local-dc", type=str, required=True,
                                  help="Local Cassandra datacenter")
         self.parser.add_argument("--replicas", "-r", type=int, default=1,
                                  help="Number of replicas per datacenter")
-        self.parser.add_argument("--keyspace", "-k", type=str, default="YACT",
+        self.parser.add_argument("--keyspace", "-k", type=str, default="yact",
                                  help="YACTSDB Keyspace")
         self.parser.add_argument("--sync", action="store_true", help="Durable writes to a keyspace")
 
@@ -87,8 +87,6 @@ class Main:
     def run(self):
         import imp
         import traceback
-        self.session = self.y.Connect()
-        print self.session.session
         for i in self.cfg.args.modul:
             m_file = "%s/%s.py"%(self.cfg.module_path, i)
             if not check_file_read(m_file):
@@ -101,14 +99,14 @@ class Main:
                 print traceback.print_exc(file=sys.stdout)
                 break
             try:
-                mod_main = mod.Module(self.cfg, self.session, i)
+                mod_main = mod.Module(self.cfg, self.y, i)
                 mod_main.run()
             except:
                 print "Error during the module %s execution" % i
                 print traceback.print_exc(file=sys.stdout)
                 break
     def __del__(self):
-        self.session.close()
+        return
 def main():
     m = Main()
     m.run()

@@ -10,13 +10,17 @@ try:
 except ImportError, msg:
     print "Error accessing Cassandra driver:", msg
 
-CREATE_KEYSPACE = """CREATE KEYSPACE %s WITH REPLICATION {'class':'NetworkTopologyStrategy'} AND DURABLE_WRITES = %s;"""
-
 class YACT_MODULE:
-    def __init__(self, cfg, session, name):
+    def __init__(self, cfg, y, name):
         self.cfg = cfg
-        self.session = session
+        self.y = y
         self.name = name
+    def Connect(self, keyspace=None):
+        if not keyspace:
+            self.session = self.y.Connect()
+        else:
+            self.keyspace = keyspace
+            self.session = self.y.Connect(self.keyspace)
     def __repr__(self):
         try:
             return self.desc
@@ -27,7 +31,7 @@ class YACT_MODULE:
         m_file = "%s/%s.py" % (self.cfg.module_path, name)
         try:
             mod = imp.load_source(name, m_file)
-            return mod.Module(self.cfg, self.session, name)
+            return mod.Module(self.cfg, self.y, name)
         except:
             print "Error during the module %s execution" % name
             print traceback.print_exc(file=sys.stdout)
@@ -37,7 +41,19 @@ class YACTS:
     def __init__(self, keyspace, cluster):
         self.keyspace = keyspace
         self.cluster = cluster
-        self.session = self.cluster.cluster.connect(self.keyspace)
+        if keyspace != None:
+            self.session = self.cluster.cluster.connect(self.keyspace)
+        else:
+            self.session = self.cluster.cluster.connect()
+    def keyspaces(self):
+        return self.cluster.cluster.metadata.keyspaces
+    def hosts(self):
+        return self.session.hosts
+    def __call__(self, q):
+        try:
+            return self.session.execute(q)
+        except KeyboardInterrupt:
+            return None
     def close(self):
         self.session.shutdown()
 
@@ -46,24 +62,22 @@ class YACT:
         self.cfg = cfg
         self.servers = cfg.servers
         self.port = cfg.args.port
-        self.keyspace = cfg.args.keyspace
+        self.keyspace = cfg.args.keyspace.lower()
         self.cluster = Cluster(
             self.servers,
             load_balancing_policy=DCAwareRoundRobinPolicy(local_dc=cfg.args.local_dc),
             port=self.port
         )
     def Connect(self, keyspace=None):
-        if keyspace not in self.cluster.metadata.keyspaces.keys():
-            self.createKeyspace(keyspace)
         try:
             if keyspace != None:
                 self.keyspace = keyspace
-            return YACTS(self.keyspace, self)
+                return YACTS(self.keyspace, self)
+            else:
+                return YACTS(None, self)
         except KeyboardInterrupt:
             pass
-    def createKeyspace(self, keyspace):
-        if keyspace in self.cluster.metadata.keyspaces.keys():
-            return
+
 
 
 
